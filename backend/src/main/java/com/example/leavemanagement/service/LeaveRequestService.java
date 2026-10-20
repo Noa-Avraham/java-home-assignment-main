@@ -12,6 +12,7 @@ import com.example.leavemanagement.repository.LeaveRequestRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 
@@ -58,19 +59,8 @@ public class LeaveRequestService {
 
         int days = (int) requestedDays;
 
-        int used = leaveRequestRepository
-                .findByEmployeeIdAndTypeAndStatus(
-                        dto.getEmployeeId(),
-                        LeaveType.VACATION,
-                        LeaveStatus.APPROVED)
-                .stream()
-                .mapToInt(LeaveRequest::getDays)
-                .sum();
-
-        if (dto.getType() == LeaveType.VACATION
-                && days > employee.getAnnualQuota()) {
-            throw new InvalidLeaveRequestException(
-                    "Not enough vacation balance");
+        if (dto.getType() == LeaveType.VACATION) {
+            validateVacationBalance(employee, dto);
         }
 
         LeaveRequest request = new LeaveRequest();
@@ -82,5 +72,49 @@ public class LeaveRequestService {
         request.setStatus(LeaveStatus.PENDING);
 
         return leaveRequestRepository.save(request);
+    }
+
+    private void validateVacationBalance(
+            Employee employee, CreateLeaveRequestDto dto) {
+
+        List<LeaveRequest> approved = leaveRequestRepository
+                .findByEmployeeIdAndTypeAndStatus(
+                        employee.getId(),
+                        LeaveType.VACATION,
+                        LeaveStatus.APPROVED);
+
+        for (int year = dto.getStartDate().getYear();
+             year <= dto.getEndDate().getYear();
+             year++) {
+
+            int currentYear = year;
+            long used = approved.stream()
+                    .mapToLong(request -> daysInYear(
+                            request.getStartDate(),
+                            request.getEndDate(),
+                            currentYear))
+                    .sum();
+
+            long requested = daysInYear(
+                    dto.getStartDate(), dto.getEndDate(), year);
+
+            if (used + requested > employee.getAnnualQuota()) {
+                throw new InvalidLeaveRequestException(
+                        "Not enough vacation balance");
+            }
+        }
+    }
+
+    private long daysInYear(LocalDate startDate, LocalDate endDate, int year) {
+        LocalDate yearStart = LocalDate.of(year, 1, 1);
+        LocalDate yearEnd = LocalDate.of(year, 12, 31);
+        LocalDate overlapStart = startDate.isAfter(yearStart) ? startDate : yearStart;
+        LocalDate overlapEnd = endDate.isBefore(yearEnd) ? endDate : yearEnd;
+
+        if (overlapStart.isAfter(overlapEnd)) {
+            return 0;
+        }
+
+        return ChronoUnit.DAYS.between(overlapStart, overlapEnd) + 1;
     }
 }
