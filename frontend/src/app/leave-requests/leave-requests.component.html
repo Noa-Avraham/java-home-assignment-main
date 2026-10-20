@@ -4,6 +4,11 @@
 
 <div *ngIf="loading">Loading...</div>
 
+<div *ngIf="loadError" role="alert">
+  {{ loadError }}
+  <button type="button" (click)="load()">Try again</button>
+</div>
+
 <table *ngIf="!loading">
   <thead>
     <tr>

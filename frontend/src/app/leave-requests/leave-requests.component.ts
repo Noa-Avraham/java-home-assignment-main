@@ -1,9 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { finalize } from 'rxjs';
+import { LeaveRequest, LeaveStatus, LeaveType } from '../models/leave-request.model';
+import { LeaveRequestsService } from '../services/leave-requests.service';
 
-// NOTE: This component was written quickly for a POC.
-// It talks to the API directly, manages state by hand and uses `any` everywhere.
 @Component({
   selector: 'app-leave-requests',
   standalone: true,
@@ -12,12 +13,12 @@ import { HttpClient } from '@angular/common/http';
   styleUrls: ['./leave-requests.component.css']
 })
 export class LeaveRequestsComponent implements OnInit {
-  requests: any[] = [];
+  private readonly service = inject(LeaveRequestsService);
+  private readonly destroyRef = inject(DestroyRef);
+
+  requests: LeaveRequest[] = [];
   loading = false;
-
-  private apiUrl = '/api/leave-requests';
-
-  constructor(private http: HttpClient) {}
+  loadError = '';
 
   ngOnInit(): void {
     this.load();
@@ -25,30 +26,45 @@ export class LeaveRequestsComponent implements OnInit {
 
   load(): void {
     this.loading = true;
-    this.http.get<any>(this.apiUrl).subscribe((data) => {
-      this.requests = data;
-      this.loading = false;
-    });
+    this.loadError = '';
+
+    this.service.getAll()
+      .pipe(
+        finalize(() => {
+          this.loading = false;
+        }),
+        takeUntilDestroyed(this.destroyRef)
+      )
+      .subscribe({
+        next: requests => {
+          this.requests = requests;
+        },
+        error: () => {
+          this.loadError = 'Could not load leave requests. Please try again.';
+        }
+      });
   }
 
   // Wired up by the candidate as part of the assignment.
   approve(id: number): void {
     // TODO (candidate): call POST /api/leave-requests/{id}/approve
     // and handle loading / error / success without a generic alert.
-    this.http.post<any>(this.apiUrl + '/' + id + '/approve', {}).subscribe(() => {
-      this.load();
-    });
+    this.service.approve(id)
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe(() => {
+        this.load();
+      });
   }
 
-  typeLabel(type: number): string {
-    if (type == 0) return 'Vacation';
-    if (type == 1) return 'Sick';
+  typeLabel(type: LeaveType): string {
+    if (type === LeaveType.Vacation) return 'Vacation';
+    if (type === LeaveType.Sick) return 'Sick';
     return 'Unpaid';
   }
 
-  statusLabel(status: number): string {
-    if (status == 0) return 'Pending';
-    if (status == 1) return 'Approved';
+  statusLabel(status: LeaveStatus): string {
+    if (status === LeaveStatus.Pending) return 'Pending';
+    if (status === LeaveStatus.Approved) return 'Approved';
     return 'Rejected';
   }
 }
