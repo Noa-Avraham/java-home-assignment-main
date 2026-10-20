@@ -2,6 +2,7 @@ package com.example.leavemanagement.service;
 
 import com.example.leavemanagement.dto.CreateLeaveRequestDto;
 import com.example.leavemanagement.exception.InvalidLeaveRequestException;
+import com.example.leavemanagement.exception.LeaveRequestConflictException;
 import com.example.leavemanagement.exception.ResourceNotFoundException;
 import com.example.leavemanagement.model.Employee;
 import com.example.leavemanagement.model.LeaveRequest;
@@ -10,6 +11,7 @@ import com.example.leavemanagement.model.LeaveType;
 import com.example.leavemanagement.repository.EmployeeRepository;
 import com.example.leavemanagement.repository.LeaveRequestRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -60,7 +62,7 @@ public class LeaveRequestService {
         int days = (int) requestedDays;
 
         if (dto.getType() == LeaveType.VACATION) {
-            validateVacationBalance(employee, dto);
+            validateVacationBalance(employee, dto.getStartDate(), dto.getEndDate());
         }
 
         LeaveRequest request = new LeaveRequest();
@@ -74,8 +76,43 @@ public class LeaveRequestService {
         return leaveRequestRepository.save(request);
     }
 
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    public LeaveRequest approve(Long id) {
+        Long employeeId = leaveRequestRepository
+                .findEmployeeIdByRequestId(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Leave request not found"));
+
+        Employee employee = employeeRepository
+                .findByIdForUpdate(employeeId)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Employee not found"));
+
+        // Load the request after acquiring the employee lock so its status is current.
+        LeaveRequest request = leaveRequestRepository.findById(id)
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("Leave request not found"));
+
+        if (request.getStatus() != LeaveStatus.PENDING) {
+            throw new LeaveRequestConflictException(
+                    "Only pending requests can be approved");
+        }
+
+        if (request.getType() == LeaveType.VACATION) {
+            try {
+                validateVacationBalance(
+                        employee, request.getStartDate(), request.getEndDate());
+            } catch (InvalidLeaveRequestException exception) {
+                throw new LeaveRequestConflictException(exception.getMessage());
+            }
+        }
+
+        request.setStatus(LeaveStatus.APPROVED);
+        return leaveRequestRepository.save(request);
+    }
+
     private void validateVacationBalance(
-            Employee employee, CreateLeaveRequestDto dto) {
+            Employee employee, LocalDate startDate, LocalDate endDate) {
 
         List<LeaveRequest> approved = leaveRequestRepository
                 .findByEmployeeIdAndTypeAndStatus(
@@ -83,8 +120,8 @@ public class LeaveRequestService {
                         LeaveType.VACATION,
                         LeaveStatus.APPROVED);
 
-        for (int year = dto.getStartDate().getYear();
-             year <= dto.getEndDate().getYear();
+        for (int year = startDate.getYear();
+             year <= endDate.getYear();
              year++) {
 
             int currentYear = year;
@@ -95,8 +132,7 @@ public class LeaveRequestService {
                             currentYear))
                     .sum();
 
-            long requested = daysInYear(
-                    dto.getStartDate(), dto.getEndDate(), year);
+            long requested = daysInYear(startDate, endDate, year);
 
             if (used + requested > employee.getAnnualQuota()) {
                 throw new InvalidLeaveRequestException(

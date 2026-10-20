@@ -11,6 +11,14 @@ import java.util.stream.Collectors;
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
+    @ExceptionHandler(LeaveRequestConflictException.class)
+    public ResponseEntity<String> handleConflict(
+            LeaveRequestConflictException exception) {
+
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(exception.getMessage());
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<String> handleValidation(
             MethodArgumentNotValidException exception) {
