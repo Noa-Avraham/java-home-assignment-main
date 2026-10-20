@@ -82,6 +82,20 @@
         </dependencies>
     </dependencyManagement>
 
+    <profiles>
+        <!-- Opt-in local development without a PostgreSQL / Docker installation. -->
+        <profile>
+            <id>local</id>
+            <dependencies>
+                <dependency>
+                    <groupId>com.h2database</groupId>
+                    <artifactId>h2</artifactId>
+                    <scope>runtime</scope>
+                </dependency>
+            </dependencies>
+        </profile>
+    </profiles>
+
     <build>
         <plugins>
             <plugin>

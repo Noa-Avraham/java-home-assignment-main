@@ -1,0 +1,8 @@
+# Enable with: mvn -Plocal spring-boot:run -Dspring-boot.run.profiles=local
+# Keep local data across restarts. PostgreSQL remains the default configuration.
+spring:
+  datasource:
+    url: jdbc:h2:file:./data/leave;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""

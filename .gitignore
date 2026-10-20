@@ -1,5 +1,7 @@
 # Java / Maven
 backend/target/
+backend/data/
+.run/
 *.class
 
 # Node / Angular
