@@ -15,7 +15,7 @@ export class LeaveRequestsComponent implements OnInit {
   requests: any[] = [];
   loading = false;
 
-  private apiUrl = 'http://localhost:5080/api/leave-requests';
+  private apiUrl = '/api/leave-requests';
 
   constructor(private http: HttpClient) {}
 

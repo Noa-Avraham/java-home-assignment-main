@@ -26,6 +26,42 @@ docker-compose.yml    PostgreSQL + backend API
 
 ### הרצה
 
+**הרצה מקומית ב־Windows בלי Docker** (צריך JDK 21, Maven ו־Node 18+):
+
+```powershell
+.\start-local.ps1
+```
+
+הסקריפט בונה ומפעיל את השרת ואת הממשק ברקע. האפליקציה זמינה בכתובת
+http://localhost:4200 והלוגים נשמרים בתיקיית `.run`.
+הממשק מעביר קריאות ל־`/api` לשרת בפורט 5080 באמצעות Angular proxy.
+בפריסה של build סטטי יש להגדיר העברה מקבילה של `/api` לשרת.
+אם PowerShell חוסם הרצת סקריפטים, אפשר להריץ:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\start-local.ps1
+```
+
+מצב `local` משתמש ב־H2 ושומר נתונים בתיקיית `backend/data` בין הרצות.
+PostgreSQL נשאר מסד הנתונים של הריצה הרגילה ושל בדיקות Testcontainers.
+כדי לעצור את השירותים, אפשר לסיים את תהליכי ה־PID שהסקריפט מדפיס באמצעות
+`Stop-Process -Id <PID>`.
+
+להפעלה ידנית, בשני חלונות טרמינל:
+
+```powershell
+# Terminal 1
+cd backend
+mvn -Plocal spring-boot:run "-Dspring-boot.run.profiles=local"
+```
+
+```powershell
+# Terminal 2
+cd frontend
+npm ci
+npm start -- --port 4200
+```
+
 **הכל ביחד עם Docker** (הדרך המומלצת — צריך Docker):
 
 <div dir="ltr">
